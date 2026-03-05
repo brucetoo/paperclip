@@ -20,7 +20,7 @@ Core fields:
 - promptTemplate (string, optional): run prompt template
 - maxTurnsPerRun (number, optional): max turns for one run
 - dangerouslySkipPermissions (boolean, optional): pass --dangerously-skip-permissions to claude
-- command (string, optional): defaults to "claude"
+- command (string, optional): defaults to "ccr code"
 - extraArgs (string[], optional): additional CLI args
 - env (object, optional): KEY=VALUE environment variables
 

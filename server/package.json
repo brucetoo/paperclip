@@ -22,7 +22,7 @@
     "skills"
   ],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/index.ts || true",
     "dev:watch": "PAPERCLIP_MIGRATION_PROMPT=never tsx watch --ignore ../ui/node_modules --ignore ../ui/.vite --ignore ../ui/dist src/index.ts",
     "build": "tsc",
     "clean": "rm -rf dist",
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",
+    "@better-auth/drizzle-adapter": "^1.5.3",
     "@paperclipai/adapter-claude-local": "workspace:*",
     "@paperclipai/adapter-codex-local": "workspace:*",
     "@paperclipai/adapter-cursor-local": "workspace:*",

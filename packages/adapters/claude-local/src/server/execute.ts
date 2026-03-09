@@ -205,7 +205,8 @@ async function buildClaudeRuntimeConfig(input: ClaudeExecutionInput): Promise<Cl
   }
 
   const runtimeEnv = ensurePathInEnv({ ...process.env, ...env });
-  await ensureCommandResolvable(command, cwd, runtimeEnv);
+  const isCcrCode = command.trim() === "ccr code";
+  await ensureCommandResolvable(isCcrCode ? "ccr" : command, cwd, runtimeEnv);
 
   const timeoutSec = asNumber(config.timeoutSec, 0);
   const graceSec = asNumber(config.graceSec, 20);

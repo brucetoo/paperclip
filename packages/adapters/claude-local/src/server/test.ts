@@ -38,7 +38,9 @@ function firstNonEmptyLine(text: string): string {
 
 function commandLooksLike(command: string, expected: string): boolean {
   const base = path.basename(command).toLowerCase();
-  return base === expected || base === `${expected}.cmd` || base === `${expected}.exe`;
+  if (base === expected || base === `${expected}.cmd` || base === `${expected}.exe`) return true;
+  if (expected === "claude" && (base === "ccr" || base === "ccr.cmd" || base === "ccr.exe")) return true;
+  return false;
 }
 
 function summarizeProbeDetail(stdout: string, stderr: string): string | null {
@@ -54,7 +56,7 @@ export async function testEnvironment(
 ): Promise<AdapterEnvironmentTestResult> {
   const checks: AdapterEnvironmentCheck[] = [];
   const config = parseObject(ctx.config);
-  const command = asString(config.command, "claude");
+  const command = asString(config.command, "ccr code");
   const cwd = asString(config.cwd, process.cwd());
 
   try {
@@ -80,7 +82,12 @@ export async function testEnvironment(
   }
   const runtimeEnv = ensurePathInEnv({ ...process.env, ...env });
   try {
-    await ensureCommandResolvable(command, cwd, runtimeEnv);
+    const isCcrCode = command.trim() === "ccr code";
+    if (isCcrCode) {
+      await ensureCommandResolvable("ccr", cwd, runtimeEnv);
+    } else {
+      await ensureCommandResolvable(command, cwd, runtimeEnv);
+    }
     checks.push({
       code: "claude_command_resolvable",
       level: "info",
@@ -118,13 +125,13 @@ export async function testEnvironment(
   const canRunProbe =
     checks.every((check) => check.code !== "claude_cwd_invalid" && check.code !== "claude_command_unresolvable");
   if (canRunProbe) {
-    if (!commandLooksLike(command, "claude")) {
+    if (!commandLooksLike(command.split(" ")[0] ?? "", "claude")) {
       checks.push({
         code: "claude_hello_probe_skipped_custom_command",
         level: "info",
-        message: "Skipped hello probe because command is not `claude`.",
+        message: "Skipped hello probe because command is not `claude` or `ccr`.",
         detail: command,
-        hint: "Use the `claude` CLI command to run the automatic login and installation probe.",
+        hint: "Use the `claude` (or `ccr code`) CLI command to run the automatic login and installation probe.",
       });
     } else {
       const model = asString(config.model, "").trim();
@@ -138,7 +145,10 @@ export async function testEnvironment(
         return asStringArray(config.args);
       })();
 
-      const args = ["--print", "-", "--output-format", "stream-json", "--verbose"];
+      const isCcrCode = command.trim() === "ccr code";
+      const bin = isCcrCode ? "ccr" : command;
+      const baseArgs = isCcrCode ? ["code", "--print", "-", "--output-format", "stream-json", "--verbose"] : ["--print", "-", "--output-format", "stream-json", "--verbose"];
+      const args = [...baseArgs];
       if (dangerouslySkipPermissions) args.push("--dangerously-skip-permissions");
       if (chrome) args.push("--chrome");
       if (model) args.push("--model", model);
@@ -148,7 +158,7 @@ export async function testEnvironment(
 
       const probe = await runChildProcess(
         `claude-envtest-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        command,
+        bin,
         args,
         {
           cwd,
@@ -156,7 +166,7 @@ export async function testEnvironment(
           timeoutSec: 45,
           graceSec: 5,
           stdin: "Respond with hello.",
-          onLog: async () => {},
+          onLog: async () => { },
         },
       );
 
@@ -199,8 +209,8 @@ export async function testEnvironment(
           ...(hasHello
             ? {}
             : {
-                hint: "Try the probe manually (`claude --print - --output-format stream-json --verbose`) and prompt `Respond with hello`.",
-              }),
+              hint: "Try the probe manually (`claude --print - --output-format stream-json --verbose`) and prompt `Respond with hello`.",
+            }),
         });
       } else {
         checks.push({

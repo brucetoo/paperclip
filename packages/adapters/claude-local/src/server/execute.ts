@@ -111,7 +111,7 @@ function resolveClaudeBillingType(env: Record<string, string>): "api" | "subscri
 async function buildClaudeRuntimeConfig(input: ClaudeExecutionInput): Promise<ClaudeRuntimeConfig> {
   const { runId, agent, config, context, authToken } = input;
 
-  const command = asString(config.command, "claude");
+  const command = asString(config.command, "ccr code");
   const workspaceContext = parseObject(context.paperclipWorkspace);
   const workspaceCwd = asString(workspaceContext.cwd, "");
   const workspaceSource = asString(workspaceContext.source, "");
@@ -120,8 +120,8 @@ async function buildClaudeRuntimeConfig(input: ClaudeExecutionInput): Promise<Cl
   const workspaceRepoRef = asString(workspaceContext.repoRef, "") || null;
   const workspaceHints = Array.isArray(context.paperclipWorkspaces)
     ? context.paperclipWorkspaces.filter(
-        (value): value is Record<string, unknown> => typeof value === "object" && value !== null,
-      )
+      (value): value is Record<string, unknown> => typeof value === "object" && value !== null,
+    )
     : [];
   const configuredCwd = asString(config.cwd, "");
   const useConfiguredInsteadOfAgentHome = workspaceSource === "agent_home" && configuredCwd.length > 0;
@@ -236,7 +236,7 @@ export async function runClaudeLogin(input: {
   authToken?: string;
   onLog?: (stream: "stdout" | "stderr", chunk: string) => Promise<void>;
 }) {
-  const onLog = input.onLog ?? (async () => {});
+  const onLog = input.onLog ?? (async () => { });
   const runtime = await buildClaudeRuntimeConfig({
     runId: input.runId,
     agent: input.agent,
@@ -245,7 +245,10 @@ export async function runClaudeLogin(input: {
     authToken: input.authToken,
   });
 
-  const proc = await runChildProcess(input.runId, runtime.command, ["login"], {
+  const isCcrCode = runtime.command.trim() === "ccr code";
+  const bin = isCcrCode ? "ccr" : runtime.command;
+
+  const proc = await runChildProcess(input.runId, bin, ["login"], {
     cwd: runtime.cwd,
     env: runtime.env,
     timeoutSec: runtime.timeoutSec,
@@ -281,8 +284,8 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const instructionsFileDir = instructionsFilePath ? `${path.dirname(instructionsFilePath)}/` : "";
   const commandNotes = instructionsFilePath
     ? [
-        `Injected agent instructions via --append-system-prompt-file ${instructionsFilePath} (with path directive appended)`,
-      ]
+      `Injected agent instructions via --append-system-prompt-file ${instructionsFilePath} (with path directive appended)`,
+    ]
     : [];
 
   const runtimeConfig = await buildClaudeRuntimeConfig({
@@ -341,8 +344,12 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     context,
   });
 
+  const isCcrCode = command.trim() === "ccr code";
+  const bin = isCcrCode ? "ccr" : command;
+
   const buildClaudeArgs = (resumeSessionId: string | null) => {
-    const args = ["--print", "-", "--output-format", "stream-json", "--verbose"];
+    const baseArgs = isCcrCode ? ["code", "--print", "-", "--output-format", "stream-json", "--verbose"] : ["--print", "-", "--output-format", "stream-json", "--verbose"];
+    const args = [...baseArgs];
     if (resumeSessionId) args.push("--resume", resumeSessionId);
     if (dangerouslySkipPermissions) args.push("--dangerously-skip-permissions");
     if (chrome) args.push("--chrome");
@@ -388,7 +395,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       });
     }
 
-    const proc = await runChildProcess(runId, command, args, {
+    const proc = await runChildProcess(runId, bin, args, {
       cwd,
       env,
       stdin: prompt,
@@ -419,8 +426,8 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     const errorMeta =
       loginMeta.loginUrl != null
         ? {
-            loginUrl: loginMeta.loginUrl,
-          }
+          loginUrl: loginMeta.loginUrl,
+        }
         : undefined;
 
     if (proc.timedOut) {
@@ -519,6 +526,6 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
 
     return toAdapterResult(initial, { fallbackSessionId: runtimeSessionId || runtime.sessionId });
   } finally {
-    fs.rm(skillsDir, { recursive: true, force: true }).catch(() => {});
+    fs.rm(skillsDir, { recursive: true, force: true }).catch(() => { });
   }
 }
